@@ -826,9 +826,9 @@ namespace video {
       },
       {
         // SDR-specific options
-        {"profile"s, [](const config_t &cfg) {
-           if (cfg.profile == 66) return "baseline"s;
-           if (cfg.profile == 77) return "main"s;
+        {"profile"s, [](const config_t &) {
+           // upstream master references cfg.profile, which no longer exists in video::config_t;
+           // hardcoded to high because this table is the AMD AMF path only
            return "high"s;
          }},
       },

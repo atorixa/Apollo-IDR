@@ -51,6 +51,18 @@ namespace nvenc {
 
     // Intra refresh for clients that doesn't request keyframe correctly
     bool intra_refresh = false;
+
+    // Emit a real IDR keyframe every N seconds (0 = never, upstream behaviour).
+    // Upstream Apollo uses an infinite GOP, so any decoder glitch stays visible forever
+    // and static UI elements slowly fill up with blocks. A periodic IDR repairs it.
+    double keyframe_interval_seconds = 2.0;
+
+    // Same repair rate as periodic IDR, but as a rolling intra refresh: no bitrate
+    // spike and no visible whole-frame refresh.
+    bool rolling_refresh = false;
+
+    // Temporal AQ: spend more bits on static / low-motion regions
+    bool temporal_aq = false;
   };
 
 }  // namespace nvenc

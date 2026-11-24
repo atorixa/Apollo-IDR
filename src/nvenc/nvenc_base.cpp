@@ -215,6 +215,11 @@ namespace nvenc {
 
     init_params.presetGUID = quality_preset_guid_from_number(config.quality_preset);
     init_params.tuningInfo = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
+    if (const char *tune = std::getenv("APOLLO_NVENC_TUNING")) {
+      std::string t{tune};
+      if (t == "quality") init_params.tuningInfo = NV_ENC_TUNING_INFO_HIGH_QUALITY;
+      else if (t == "low") init_params.tuningInfo = NV_ENC_TUNING_INFO_LOW_LATENCY;
+    }
     init_params.enablePTD = 1;
     init_params.enableEncodeAsync = async_event_handle ? 1 : 0;
     init_params.enableWeightedPrediction = config.weighted_prediction && get_encoder_cap(NV_ENC_CAPS_SUPPORT_WEIGHTED_PREDICTION);
@@ -224,6 +229,28 @@ namespace nvenc {
     init_params.encodeHeight = encoder_params.height;
     init_params.darHeight = encoder_params.height;
     init_params.frameRateNum = client_config.framerate;
+    // --- ATORIXA PATCH: periodic IDR -------------------------------------
+    // Apollo hardcodes an infinite GOP, so the client never gets a keyframe
+    // and any decode glitch stays visible forever (blocky UI in static
+    // areas). Emit a real IDR every N seconds instead.
+    auto idr_frames = [&]() -> uint32_t {
+      const char *env = std::getenv("APOLLO_IDR_SECONDS");
+      double secs = env ? std::atof(env) : static_cast<double>(config.keyframe_interval_seconds);
+      if (secs <= 0.0) return NVENC_INFINITE_GOPLENGTH;
+      uint32_t fps = client_config.framerate > 0 ? static_cast<uint32_t>(client_config.framerate) : 60;
+      uint32_t n = static_cast<uint32_t>(std::lround(secs * static_cast<double>(fps)));
+      return n < 2 ? 2 : n;
+    };
+    BOOST_LOG(info) << "NvEnc: keyframe interval (idr/gop) = " << idr_frames() << " frames";
+    auto env_flag = [](const char *name) {
+      const char *v = std::getenv(name);
+      if (!v) return false;
+      std::string s{v};
+      return !(s.empty() || s == "0" || s == "off" || s == "false");
+    };
+    const bool intra_refresh_mode = env_flag("APOLLO_INTRA_REFRESH") || config.rolling_refresh;
+    BOOST_LOG(info) << "NvEnc: refresh mode = " << (intra_refresh_mode ? "intra (rolling)" : "idr");
+    // ---------------------------------------------------------------------
     init_params.frameRateDen = 1;
 
     NV_ENC_PRESET_CONFIG preset_config = {min_struct_version(NV_ENC_PRESET_CONFIG_VER), {min_struct_version(NV_ENC_CONFIG_VER, 7, 8)}};
@@ -234,7 +261,7 @@ namespace nvenc {
 
     NV_ENC_CONFIG enc_config = preset_config.presetCfg;
     enc_config.profileGUID = NV_ENC_CODEC_PROFILE_AUTOSELECT_GUID;
-    enc_config.gopLength = NVENC_INFINITE_GOPLENGTH;
+    enc_config.gopLength = intra_refresh_mode ? NVENC_INFINITE_GOPLENGTH : idr_frames();
     enc_config.frameIntervalP = 1;
     enc_config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
     enc_config.rcParams.zeroReorderDelay = 1;
@@ -245,6 +272,10 @@ namespace nvenc {
                                                                                             NV_ENC_MULTI_PASS_DISABLED;
 
     enc_config.rcParams.enableAQ = config.adaptive_quantization;
+    if ((env_flag("APOLLO_NVENC_TEMPORAL_AQ") || config.temporal_aq) && get_encoder_cap(NV_ENC_CAPS_SUPPORT_TEMPORAL_AQ)) {
+      enc_config.rcParams.enableTemporalAQ = 1;
+      BOOST_LOG(info) << "NvEnc: temporal AQ enabled";
+    }
     enc_config.rcParams.averageBitRate = client_config.bitrate * 1000;
 
     if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_CUSTOM_VBV_BUF_SIZE)) {
@@ -256,7 +287,7 @@ namespace nvenc {
 
     auto set_h264_hevc_common_format_config = [&](auto &format_config) {
       format_config.repeatSPSPPS = 1;
-      format_config.idrPeriod = NVENC_INFINITE_GOPLENGTH;
+      format_config.idrPeriod = intra_refresh_mode ? NVENC_INFINITE_GOPLENGTH : idr_frames();
       format_config.sliceMode = 3;
       format_config.sliceModeData = client_config.slicesPerFrame;
       if (buffer_is_yuv444()) {
@@ -288,6 +319,27 @@ namespace nvenc {
       }
     };
 
+    auto apply_intra_refresh = [&](auto &format_config) {
+      if (!intra_refresh_mode) {
+        return;
+      }
+      if (!get_encoder_cap(NV_ENC_CAPS_SUPPORT_INTRA_REFRESH)) {
+        BOOST_LOG(error) << "NvEnc: intra refresh requested but the encoder does not support it";
+        return;
+      }
+      auto period = idr_frames();
+      if (period == NVENC_INFINITE_GOPLENGTH) {
+        period = 120;
+      }
+      format_config.enableIntraRefresh = 1;
+      format_config.intraRefreshPeriod = period;
+      format_config.intraRefreshCnt = period > 1 ? period - 1 : 1;
+      if (get_encoder_cap(NV_ENC_CAPS_SINGLE_SLICE_INTRA_REFRESH)) {
+        format_config.singleSliceIntraRefresh = 1;
+      }
+      BOOST_LOG(info) << "NvEnc: intra refresh period = " << period << " frames";
+    };
+
     auto fill_h264_hevc_vui = [&](auto &vui_config) {
       vui_config.videoSignalTypePresentFlag = 1;
       vui_config.videoFormat = NV_ENC_VUI_VIDEO_FORMAT_UNSPECIFIED;
@@ -308,6 +360,7 @@ namespace nvenc {
           enc_config.profileGUID = buffer_is_yuv444() ? NV_ENC_H264_PROFILE_HIGH_444_GUID : NV_ENC_H264_PROFILE_HIGH_GUID;
           auto &format_config = enc_config.encodeCodecConfig.h264Config;
           set_h264_hevc_common_format_config(format_config);
+          apply_intra_refresh(format_config);
           if (config.h264_cavlc || !get_encoder_cap(NV_ENC_CAPS_SUPPORT_CABAC)) {
             format_config.entropyCodingMode = NV_ENC_H264_ENTROPY_CODING_MODE_CAVLC;
           } else {
@@ -324,6 +377,7 @@ namespace nvenc {
           // HEVC
           auto &format_config = enc_config.encodeCodecConfig.hevcConfig;
           set_h264_hevc_common_format_config(format_config);
+          apply_intra_refresh(format_config);
           if (buffer_is_10bit()) {
             format_config.pixelBitDepthMinus8 = 2;
           }
@@ -352,7 +406,7 @@ namespace nvenc {
           // AV1
           auto &format_config = enc_config.encodeCodecConfig.av1Config;
           format_config.repeatSeqHdr = 1;
-          format_config.idrPeriod = NVENC_INFINITE_GOPLENGTH;
+          format_config.idrPeriod = idr_frames();
           if (buffer_is_yuv444()) {
             format_config.chromaFormatIDC = 3;
           }

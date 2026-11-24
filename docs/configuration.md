@@ -2236,6 +2236,87 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### nvenc_keyframe_interval
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Keyframe (IDR) interval in seconds. Upstream Apollo encodes with an infinite GOP, so the client
+            never receives a keyframe after the first one and any decode glitch stays on screen until the
+            session ends. Setting a real interval makes the encoder emit a full keyframe periodically, which
+            repairs corrupted blocks (blocky patches in static areas, smeared UI text).
+            @note{This option only applies when using NVENC [encoder](#encoder).}
+            @note{Fractions are allowed, e.g. @code{}0.5@endcode. Set to @code{}0@endcode for the upstream behaviour (infinite GOP).}
+            @warning{Every keyframe costs extra bitrate. At 2 seconds the overhead is under 1% at 30 Mbps; at 0.5 seconds expect roughly 3-4% and a faint "breathing" around each refresh.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            2
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            nvenc_keyframe_interval = 1
+            @endcode</td>
+    </tr>
+</table>
+
+### nvenc_rolling_refresh
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Rolling intra refresh: spread the keyframe cost over every frame instead of sending one big
+            keyframe. Slower to repair, but visually smoother while it does.
+            @note{This option only applies when using NVENC [encoder](#encoder).}
+            @warning{Known to produce a black screen (audio only) on Realtek/SCBC TV decoders, which do not
+            handle single-slice intra refresh. Leave disabled unless you have verified it works on your client.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            nvenc_rolling_refresh = disabled
+            @endcode</td>
+    </tr>
+</table>
+
+### nvenc_temporal_aq
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Temporal adaptive quantization. Lets the encoder move bits to low-motion and flat areas where
+            banding and blockiness are the most visible, which helps static UIs and dark scenes.
+            @note{This option only applies when using NVENC [encoder](#encoder), and only takes effect when the GPU reports support for it.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            nvenc_temporal_aq = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ### nvenc_vbv_increase
 
 <table>

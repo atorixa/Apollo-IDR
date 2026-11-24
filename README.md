@@ -1,209 +1,128 @@
-# Apollo
+# Apollo-IDR
 
-Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, native client resolution, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
+A fork of [Apollo](https://github.com/ClassicOldSong/Apollo) that makes the NVENC encoder emit **periodic keyframes**, so decode glitches no longer stay on screen forever.
 
-Major features:
+If you streamed a desktop or a game over Moonlight/Artemis and watched blocky squares appear in static areas — a wallpaper, a taskbar, a HUD, a game menu — and pile up over time until you reconnected, this fork is for you.
 
-- [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
-- [x] Permission management for clients
-- [x] Clipboard sync
-- [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
-- [x] Input only mode
+> This is not a general-purpose replacement for Apollo. It is upstream Apollo master with one behaviour changed, plus the compilation fixes needed to build it with a current toolchain. Read [What changed](#what-changed), then decide.
 
-## Usage
+## The bug
 
-Refer to LizardByte's documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine) for now.
+Upstream Apollo (and Sunshine before it) configures NVENC with an **infinite GOP**:
 
-Currently Virtual Display support is Windows only, Linux support is planned and will be implemented in the future.
-
-## About Permission System
-
-Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
-
-> [!NOTE]
-> The **FIRST** client paired with Apollo will be granted with FULL permissions, then other newly paired clients will only be granted with `View Streams` and `List Apps` permission. If you encounter `Permission Denied` error when trying to launch any app, go check the permission for that device and grant `Launch Apps` permission. The same applies to the situation when you find that you can't move mouse or type with keyboard on newly paired clients, grant the corresponding client `Mouse Input` and `Keyboard Input` permissions.
-
-## About Virtual Display
-
-> [!WARNING]
-> ***It is highly recommend to remove any other virtual display solutions from your system and Apollo/Sunshine config, to reduce confusions and compatibility issues.***
-
-> [!NOTE]
-> **TL;DR** Just treat your Artemis/Moonlight client like a dedicated PnP monitor with Apollo.
-
-Apollo uses SudoVDA for virtual display. It features auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you do not see a new virtual display added or removed when the stream starts or stops, there may be a driver misconfiguration, or another persistent virtual display might still be active.**
-
-The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
-
-## Configuration for dual GPU laptops
-
-Apollo supports dual GPUs seamlessly.
-
-If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enable `Headless mode` in `Audio/Video` tab, save and restart your computer. No dummy plug is needed any more, the image will be rendered and encoded directly from your dGPU.
-
-## About HDR
-
-HDR starts supporting from Windows 11 23H2 and generally supported on 24H2. Some systems might not have HDR toggle on 23H2 and you just need to upgrade to 24H2. Any system lower than 23H2/Windows 10 will not have HDR option available.
-
-> [!NOTE]
-> The below section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
->
-> Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
->
-> If you have had good experience with HDR previously, you can safely ignore this section.
->
-> If you're curious, read on, but don't blame Apollo for poor HDR support.
-
-Whether HDR streaming looks good, it depends completely on your client.
-
-In short, ICC color correction should be totally useless while streaming HDR. It's your client's job to get HDR content displayed right, not the host. But in fact, it does affect the captured video stream and reflect changes on devices that can handle HDR correctly. On other devices that can't, the info is not respected at all.
-
-It's very complicated to explain why HDR is a total mess, and why enabling HDR makes the image appear dark/yellow. If it's your first time got HDR streaming working, and thinks HDR looks awful, you're right, but that's not Apollo's fault, it's your device that tone mapped SDR content to the maximum of the capability of its screen, there's no headroom for anything beyond that actual peak brightness for HDR. For details, please take a look [here](https://github.com/ClassicOldSong/Apollo/issues/164).
-
-For client devices, usually Apple products that have HDR capability can be trusted to have good results, other than that, your luck depends.
-
-<details>
-<summary>DEPRECATION ALERT</summary>
-
-Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatible standards, and massive variance between device configurations and capabilities. Game support for HDR is still choppy.
-
-SDR actually provides much more stable color accuracy, and are widely supported throughout most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
-
-</details>
-
-## How to run multiple instances of Apollo for multiple virtual displays
-
-Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
-
-## FAQ
-Moved to [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/FAQ)
-
-## Stuttering Clinic
-Here're some common causes and solutions for stutters: [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic).
-
-## Device specific setups
-- Pixel devices might not be able to use native resolution:
-  - Change the device resolution to Max: https://github.com/ClassicOldSong/Apollo/issues/700
-
-## System Requirements
-
-> **Warning**: This table is a work in progress. Do not purchase hardware based on this.
-
-**Minimum Requirements**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: VCE 1.0 or higher, see: [obs-amd hardware support](https://github.com/obsproject/obs-amd-encoder/wiki/Hardware-Support) |
-|               | Intel: VAAPI-compatible, see: [VAAPI hardware support](https://www.intel.com/content/www/us/en/developer/articles/technical/linuxmedia-vaapi.html) |
-|               | Nvidia: NVENC enabled cards, see: [nvenc support matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new) |
-| CPU           | AMD: Ryzen 3 or higher |
-|               | Intel: Core i3 or higher |
-| RAM           | 4GB or more |
-| OS            | Windows: 10+ (Windows Server requires [manual installation](https://github.com/nefarius/ViGEmBus/issues/153) for gamepad support) |
-|               | macOS: 12+ |
-|               | Linux/Debian: 11 (bullseye) |
-|               | Linux/Fedora: 39+ |
-|               | Linux/Ubuntu: 22.04+ (jammy) |
-| Network       | Host: 5GHz, 802.11ac |
-|               | Client: 5GHz, 802.11ac |
-
-**4k Suggestions**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.1 or higher |
-|               | Intel: HD Graphics 510 or higher |
-|               | Nvidia: GeForce GTX 1080 or higher |
-| CPU           | AMD: Ryzen 5 or higher |
-|               | Intel: Core i5 or higher |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
-
-**HDR Suggestions**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.4 or higher |
-|               | Intel: UHD Graphics 730 or higher |
-|               | Nvidia: Pascal-based GPU (GTX 10-series) or higher |
-| CPU           | AMD: todo |
-|               | Intel: todo |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
-
-## Integrations
-
-SudoVDA: Virtual Display Adapter Driver used in Apollo
-
-[Artemis](https://github.com/ClassicOldSong/moonlight-android): Integrated Virtual Display options control from client side
-
-**NOTE**: Artemis currently supports Android only. Other platforms will come later.
-
-## Support
-
-Currently support is only provided via GitHub Issues/Discussions.
-
-No real time chat support will ever be provided for Apollo and Artemis. Including but not limited to:
-
-- Discord
-- Telegram
-- Whatsapp
-- QQ
-- WeChat 
-
-> When there's a chat, there're dramas. -- Confucius
-
-## Downloads
-
-### Direct Download
-
-**Recommended**
-
-[Releases](https://github.com/ClassicOldSong/Apollo/releases)
-
-### WinGet
-
-**Note:** Community maintained
-
-In an elevated PowerShell window, run
-
-```pwsh
-winget install ClassicOldSong.Apollo
-
+```cpp
+enc_config.gopLength = NVENC_INFINITE_GOPLENGTH;
+format_config.idrPeriod = NVENC_INFINITE_GOPLENGTH;
 ```
 
-You'll need WinGet installed first.
+The encoder sends exactly one keyframe, at the start of the session, and never another. A keyframe (IDR) is the only frame that is fully self-contained — everything after it is a delta against the previous picture. So when the decoder produces a bad block once — a lost packet, a driver hiccup, an out-of-order frame — that error becomes part of the reference picture, and every following frame inherits it.
 
-### Chocolatey
+Nothing ever repairs it:
 
-**Note:** Community maintained
+- the client only asks for a new keyframe after it detects packet loss (`moonlight-common-c`), and on a wired LAN there is no packet loss;
+- `nvenc_intra_refresh` in `sunshine.conf` is a **no-op for Moonlight clients** — the server only enables intra refresh when the client sends the RTSP argument `x-ss-video[0].intraRefresh=1`, and both Moonlight and Artemis leave it at the default `0`;
+- raising the bitrate changes nothing, because the damage is not caused by compression;
+- changing the codec (H.264 vs HEVC) or the client app changes nothing either.
 
-You can also install the apollo streaming server with chocolatey.
+The result is what people describe as "the blocks appear and never go away", and it is worse in static scenes because nothing in the picture changes to mask the damage.
 
-Install Chocolatey if you don't have it, then run the following command in an elevated PowerShell/CMD window:
+## What this fork does
 
-```pwsh
-choco upgrade apollo -y 
+Puts a real keyframe interval back:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `nvenc_keyframe_interval` | `2` | Seconds between keyframes. Fractions allowed (`0.5`). `0` restores upstream behaviour (infinite GOP). |
+| `nvenc_rolling_refresh` | `disabled` | Rolling intra refresh instead of hard keyframes — smoother, repairs slower. **Known to give a black screen (audio only) on Realtek/SCBC TV decoders.** |
+| `nvenc_temporal_aq` | `disabled` | NVENC temporal AQ: shift bits towards flat, low-motion areas where banding and blockiness show first. |
+
+All three are plain `sunshine.conf` keys and appear in the web UI under **Configuration → Audio/Video → NVIDIA NVENC Encoder**.
+
+Measured cost of keyframes at 720p60, CBR 30 Mbps, static-ish content: **+0.8 % bitrate at 2 s**, roughly +3–4 % at 0.5 s. No measurable latency, because the keyframe is encoded in the same frame slot and the VBV buffer absorbs the burst.
+
+Two environment variables still work as build-time overrides: `APOLLO_IDR_SECONDS` and `APOLLO_INTRA_REFRESH`, plus `APOLLO_NVENC_TUNING` (`quality` / `low` / unset) to switch the NVENC tuning info away from `ULTRA_LOW_LATENCY`.
+
+### Diagnostics it adds to the log
+
+```
+NvEnc: keyframe interval (idr/gop) = 120 frames
+NvEnc: refresh mode = idr
+NvEnc: intra refresh period = 60 frames     (only with rolling refresh)
+NvEnc: temporal AQ enabled                  (only with temporal AQ)
 ```
 
-Same command can be used to upgrade, add to a scheduled task to automate updates.
+## What changed
 
-See more details on the chocolatey package [here](https://community.chocolatey.org/packages/apollo)
+Against `ClassicOldSong/Apollo` master (`adc5c5a`):
 
-## Disclaimer
+- `src/nvenc/nvenc_base.cpp` — periodic `gopLength` / `idrPeriod` from `nvenc_keyframe_interval`, optional rolling intra refresh, optional temporal AQ, log lines above.
+- `src/nvenc/nvenc_config.h` — three new config fields.
+- `src/config.cpp` — parse `nvenc_keyframe_interval`, `nvenc_rolling_refresh`, `nvenc_temporal_aq`.
+- `src_assets/common/assets/web/` — the three controls, their strings, and their defaults (`configs/tabs/encoders/NvidiaNvencEncoder.vue`, `config.html`, `public/assets/locale/en.json`).
+- `docs/configuration.md` — documentation for the new keys.
 
-I got kicked from Moonlight and Sunshine's Discord server and banned from Sunshine's GitHub repo literally for helping people out.
+Plus three fixes that are **not** mine and **not** related to the change, but without which upstream master does not build on a current toolchain:
 
-This is what I got for finding a bug, opened an issue, getting no response, troubleshoot myself, fixed the issue myself, shared it by PR to the main repo hoping my efforts can help someone else during the maintenance gap.
+1. **OpenSSL 4.x** — `ASN1_BIT_STRING` became opaque and `X509_get_subject_name()` returns `const`. Fixed in `src/crypto.cpp` with `ASN1_STRING_get0_data()` / `ASN1_STRING_length()` and a `const_cast`.
+2. **`src/video.cpp`** — master references `cfg.profile`, which no longer exists in `video::config_t`, so the file does not compile at all. The AMD AMF option table now returns `"high"`.
+3. **Boost + CMake 4.x** — Boost's own `CMakeLists.txt` calls `source_group()` with a file outside the tree, which CMake 4 rejects. This one is applied to the downloaded Boost source inside `build/_deps`, not to a tracked file; see [Building](#building).
 
-Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android) will no longer be compatible with OG Sunshine and OG Moonlight eventually, but they'll work even better with much more carefully designed features.
+## Building (Windows)
 
-The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ability but I got kicked out just for helping others.
+Requirements: MSYS2 with the UCRT64 toolchain, CMake ≥ 3.20, Ninja, and the **official** Node.js build (not the MSYS2 one) visible on `PATH` as `npm`.
 
-**PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
+```powershell
+# 1. MSYS2 once
+#    install msys2, then from a UCRT64 shell:
+pacman -Syu
+pacman -S --needed base-devel git mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-cmake \
+  mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-boost mingw-w64-ucrt-x86_64-cppwinrt \
+  mingw-w64-ucrt-x86_64-curl-winssl mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-opus \
+  mingw-w64-ucrt-x86_64-miniupnpc mingw-w64-ucrt-x86_64-onevpl mingw-w64-ucrt-x86_64-nlohmann-json \
+  mingw-w64-ucrt-x86_64-nsis
 
-**Update**: They have contacted me and apologized for this incident, but the fact it **happened** still motivated me to start my own fork.
+# 2. clone
+git clone --recurse-submodules --shallow-submodules https://github.com/atorixa/Apollo-IDR.git
+cd Apollo-IDR
+
+# 3. configure — this is the step where Boost's source_group() breaks on CMake 4
+cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=Release
+```
+
+If configure dies with `source_group ... is not a prefix of ...`, comment out every `source_group` line in the downloaded Boost tree and configure again:
+
+```bash
+grep -rl '^\s*source_group' build/_deps/boost-src/libs/*/CMakeLists.txt \
+  | xargs sed -i 's/^\(\s*source_group\)/# disabled (cmake4): \1/'
+cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=Release
+```
+
+```bash
+ninja -C build          # produces build/sunshine.exe (~55 MB, fully static)
+cpack -G ZIP            # optional: portable archive
+```
+
+The web UI is a separate vite build that runs as part of the cmake build; its output lands in `build/assets/web/`.
+
+## Installing
+
+The Windows build is a **drop-in replacement for `sunshine.exe`**, but the web UI is served **from disk**, not from the binary. If you only copy the exe you keep the old settings page and the new fields will be missing.
+
+1. Stop the `ApolloService` service.
+2. Back up `C:\Program Files\Apollo\sunshine.exe` and `C:\Program Files\Apollo\assets\web\`.
+3. Copy the new `sunshine.exe` into `C:\Program Files\Apollo\`.
+4. Copy `assets/web/` from the build over `C:\Program Files\Apollo\assets\web\`.
+5. Start `ApolloService`, then hard-reload the web UI (`Ctrl+Shift+R`) — the browser caches the old javascript bundle.
+
+Release assets on this repo contain a ready `sunshine.exe` plus the matching `assets/web/`.
+
+## Notes and caveats
+
+- **No update mechanism, no telemetry.** Upstream Apollo has no self-updater and this fork does not add one; nothing here phones home and nothing will overwrite your installation. Updates are manual: pull, build, copy. The version string comes from the git tag, so a build from this repo can never be mistaken for an upstream release.
+- **The client still matters.** A client that requests a keyframe after packet loss is still the primary repair mechanism; this fork only guarantees a ceiling on how long damage can survive.
+- **Rolling refresh** (`nvenc_rolling_refresh`) reproduces a black screen with audio on the Realtek/SCBC decoder found in cheap Android TV boxes (tested on a Thomson ATV R1 / rtd284o). It is documented, but leave it off there.
+- Upstream documentation, virtual display, HDR, clipboard sync, input modes and everything else are unchanged — see [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) and [LizardByte's Sunshine docs](https://docs.lizardbyte.dev/projects/sunshine).
 
 ## License
 
-GPLv3
+GPL-3.0, same as upstream. Original work © the Apollo and Sunshine contributors; the keyframe-interval patch and the build fixes are released under the same license.

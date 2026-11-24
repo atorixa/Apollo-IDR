@@ -46,6 +46,30 @@ const config = ref(props.config)
               default="false"
     ></Checkbox>
 
+    <!-- Keyframe interval -->
+    <div class="mb-3">
+      <label for="nvenc_keyframe_interval" class="form-label">{{ $t('config.nvenc_keyframe_interval') }}</label>
+      <input type="number" min="0" max="60" step="0.1" class="form-control" id="nvenc_keyframe_interval" placeholder="2"
+             v-model="config.nvenc_keyframe_interval" />
+      <div class="form-text">{{ $t('config.nvenc_keyframe_interval_desc') }}</div>
+    </div>
+
+    <!-- Rolling refresh -->
+    <Checkbox class="mb-3"
+              id="nvenc_rolling_refresh"
+              locale-prefix="config"
+              v-model="config.nvenc_rolling_refresh"
+              default="false"
+    ></Checkbox>
+
+    <!-- Temporal AQ -->
+    <Checkbox class="mb-3"
+              id="nvenc_temporal_aq"
+              locale-prefix="config"
+              v-model="config.nvenc_temporal_aq"
+              default="false"
+    ></Checkbox>
+
     <!-- Single-frame VBV/HRD percentage increase -->
     <div class="mb-3">
       <label for="nvenc_vbv_increase" class="form-label">{{ $t('config.nvenc_vbv_increase') }}</label>
